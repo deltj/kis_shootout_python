@@ -48,13 +48,13 @@ if __name__ == "__main__":
     if args.ask_for_password:
         password = getpass.getpass()
 
-    sources = []
+    sources_by_name = dict()
     for source_name in args.sources:
         si = SourceInfo()
         si.name = source_name
-        sources.append(si)
+        sources_by_name[source_name] = si
 
-    if len(sources) < 2:
+    if len(sources_by_name) < 2:
         print("A shootout with only one data source is uninteresting, but whatever...")
 
     # Connect to Kismet
@@ -68,7 +68,7 @@ if __name__ == "__main__":
 
     # Update data source UUIDs
     datasources = kr.datasources()
-    for source in sources:
+    for source_name, source in sources_by_name.items():
         for ds in datasources:
             if ds['kismet.datasource.name'] == source.name:
                 source.uuid = ds['kismet.datasource.uuid']
@@ -77,12 +77,11 @@ if __name__ == "__main__":
             sys.exit(0)
 
     # Set channel for specified data sources
-    #state = State.Syncing
+    state = State.Syncing
     #print("Tuning data sources to channel {}".format(args.channel))
     #for source in sources:
     #    print("uuid: {}, channel: {}".format(source.uuid, args.channel))
     #    kr.config_datasource_set_channel(source.uuid, args.channel)
-    state = State.Collecting
 
     counts = dict()
 
@@ -90,15 +89,24 @@ if __name__ == "__main__":
         datasources = kr.datasources()
 
         if state == State.Syncing:
-            # Wait for data sources to all be on the same channel
-            pass
+            # TODO:Wait for data sources to all be on the same channel
     
+            # Update packet counter offsets
+            for ds in datasources:
+                ds_name = ds['kismet.datasource.name']
+                sources_by_name[ds_name].offset = ds['kismet.datasource.num_packets']
+                print("Offset for {} = {}".format(ds_name, sources_by_name[ds_name].offset))
+
+            state = State.Collecting
+            
         elif state == State.Collecting:
             # Update packet counters
             for ds in datasources:
-                counts[ds['kismet.datasource.name']] = ds['kismet.datasource.num_packets']
+                ds_name = ds['kismet.datasource.name']
+                counts[ds_name] = ds['kismet.datasource.num_packets'] - sources_by_name[ds_name].offset
 
             max_count = max(counts.values())
+            if max_count == 0: max_count = 1
 
             for ifc, count in counts.items():
                 print("{} {} ({:.2%})".format(ifc, count, count / max_count))
