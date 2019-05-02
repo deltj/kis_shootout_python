@@ -78,10 +78,11 @@ if __name__ == "__main__":
 
     # Set channel for specified data sources
     state = State.Syncing
-    #print("Tuning data sources to channel {}".format(args.channel))
-    #for source in sources:
-    #    print("uuid: {}, channel: {}".format(source.uuid, args.channel))
-    #    kr.config_datasource_set_channel(source.uuid, args.channel)
+    print("Tuning data sources to channel {}".format(args.channel))
+    for source_name, source in sources_by_name.items():
+        print("uuid: {}, channel: {}".format(source.uuid, args.channel))
+        fart = kr.config_datasource_set_channel(source.uuid, str(args.channel))
+        print(fart)
 
     counts = dict()
 
