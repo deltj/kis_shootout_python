@@ -27,9 +27,9 @@ uri = "http://localhost:2501"
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description="Kismet 802.11 datasource shootout")
-    parser.add_argument("sources", metavar="source", nargs="+",
-            help="data sources to use in the shootout")
+    parser = argparse.ArgumentParser(description="Kismet datasource shootout")
+    parser.add_argument("sources", metavar="SRC", nargs="+",
+            help="data sources to use in the shootout (e.g. wlan0)")
     parser.add_argument("-c", dest="channel", type=int, required=True,
             help="the channel to monitor")
     parser.add_argument("-u", dest="user",
@@ -81,8 +81,7 @@ if __name__ == "__main__":
     print("Tuning data sources to channel {}".format(args.channel))
     for source_name, source in sources_by_name.items():
         print("uuid: {}, channel: {}".format(source.uuid, args.channel))
-        fart = kr.config_datasource_set_channel(source.uuid, str(args.channel))
-        print(fart)
+        kr.config_datasource_set_channel(source.uuid, str(args.channel))
 
     counts = dict()
 
