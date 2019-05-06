@@ -20,4 +20,4 @@ optional arguments:
   -p          tells this program to prompt for a password
 ```
 
-I run it like this: `./shootout.py -u kismet -p -c 8 alfa3 alfa4`
+I run it like this: `./shootout -u kismet -p -c 8 alfa3 alfa4`
