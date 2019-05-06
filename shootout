@@ -94,8 +94,9 @@ if __name__ == "__main__":
             # Update packet counter offsets
             for ds in datasources:
                 ds_name = ds['kismet.datasource.name']
-                sources_by_name[ds_name].offset = ds['kismet.datasource.num_packets']
-                print("Offset for {} = {}".format(ds_name, sources_by_name[ds_name].offset))
+                if ds_name in sources_by_name:
+                    sources_by_name[ds_name].offset = ds['kismet.datasource.num_packets']
+                    print("Offset for {} = {}".format(ds_name, sources_by_name[ds_name].offset))
 
             state = State.Collecting
             
@@ -103,7 +104,8 @@ if __name__ == "__main__":
             # Update packet counters
             for ds in datasources:
                 ds_name = ds['kismet.datasource.name']
-                counts[ds_name] = ds['kismet.datasource.num_packets'] - sources_by_name[ds_name].offset
+                if ds_name in sources_by_name:
+                    counts[ds_name] = ds['kismet.datasource.num_packets'] - sources_by_name[ds_name].offset
 
             max_count = max(counts.values())
             if max_count == 0: max_count = 1
