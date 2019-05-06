@@ -6,7 +6,7 @@ The original Ruby implementation can be found here: https://github.com/trainman4
 This program compares the received packet counters from multiple Kismet datasources.
 
 ```
-usage: shootout.py [-h] -c CHANNEL [-u USER] [-p] SRC [SRC ...]
+usage: shootout [-h] -c CHANNEL [-u USER] [-p] SRC [SRC ...]
 
 Kismet datasource shootout
 
