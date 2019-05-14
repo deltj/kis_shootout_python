@@ -125,15 +125,14 @@ if __name__ == "__main__":
 
     # Tune data sources to the specified channel
     state = State.Syncing
-    print("Tuning data sources to channel {}".format(args.channel))
     for source_name, source in sources_by_name.copy().items():
-        #print("uuid: {}, channel: {}".format(source.uuid, args.channel))
+        print("Tuning data source {} to channel {}".format(source_name, args.channel))
 
         try:
             # This could throw a KismetRequestException if the tune fails
             kr.config_datasource_set_channel(source.uuid, args.channel)
 
-        except:
+        except KismetRest.KismetRequestException:
             print("Failed to tune {} to {}, ignoring this datasource".format(source_name, args.channel))
 
             # Remove this datsource from the list
