@@ -3,10 +3,17 @@
 import argparse
 from enum import Enum
 import getpass
+import signal
 import sys
 import time
 
 import KismetRest
+
+# URI for accessing Kismet
+uri = "http://localhost:2501"
+
+# Flag to tell the program to exit
+die = False
 
 # Current program state. Syncing means we're waiting for cards to be tuned to
 # the specified channel, Collecting means the cards are tuned and we're counting
@@ -23,7 +30,12 @@ class SourceInfo:
     count = 0       # The number of frames observed by this data source
     offset = 0      # Frame count offset (to account for sync time)
 
-uri = "http://localhost:2501"
+def signal_handler(sig, frame):
+    global die
+
+    if sig == signal.SIGINT:
+        print("Caught SIGINT")
+        die = True
 
 def have_source(kr, source_name):
     """
@@ -58,6 +70,9 @@ def have_interface(kr, interface_name):
     return False
 
 if __name__ == "__main__":
+
+    # Register signal handler for SIGINT (CTRL+C) 
+    signal.signal(signal.SIGINT, signal_handler)
 
     parser = argparse.ArgumentParser(description="Kismet datasource shootout")
     parser.add_argument("sources", metavar="SRC", nargs="+",
@@ -147,6 +162,11 @@ if __name__ == "__main__":
     counts = dict()
 
     while True:
+        # Check if we've been killed
+        if die:
+            print("Quitting...")
+            sys.exit(0)
+
         # Check that our session is still valid
         if not kr.check_session():
             print("check_session failed")
