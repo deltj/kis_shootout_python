@@ -1,7 +1,7 @@
 # kis_shootout_python
 Kismet WiFi data source shootout implementation in Python3.
 
-The original Ruby implementation can be found here: https://github.com/trainman419/kismet/blob/master/ruby/kismet_shootout.rb
+The original Ruby implementation can be found here: https://github.com/kismetwireless/kismet/blob/Kismet-Stable/ruby/kismet_shootout.rb
 
 This program compares the received packet counters from multiple Kismet datasources.
 
