@@ -26,8 +26,8 @@ class State(Enum):
 class SourceInfo:
     name = ""       # The name of this data source
     uuid = 0        # Kismet's UUID for this data source
-    chan = 0        # The channel this data source is tuned to
     count = 0       # The number of frames observed by this data source
+    last_count = 0  # The number of frames observed by this data source, one second ago
     offset = 0      # Frame count offset (to account for sync time)
 
 def signal_handler(sig, frame):
@@ -69,7 +69,18 @@ def have_interface(kr, interface_name):
 
     return False
 
+def get_max(sources_by_name):
+    max_packets = 0
+
+    for source_name, source in sources_by_name.items():
+        if source.count > max_packets:
+            max_packets = source.count
+
+    return max_packets
+
+
 if __name__ == "__main__":
+    sources_by_name = dict()
 
     # Register signal handler for SIGINT (CTRL+C) 
     signal.signal(signal.SIGINT, signal_handler)
@@ -95,7 +106,6 @@ if __name__ == "__main__":
     if args.ask_for_password:
         password = getpass.getpass()
 
-    sources_by_name = dict()
     for source_name in args.sources:
         si = SourceInfo()
         si.name = source_name
@@ -159,8 +169,7 @@ if __name__ == "__main__":
         print("No sources to test!")
         sys.exit(1)
 
-    counts = dict()
-
+    t=0
     while True:
         # Check if we've been killed
         if die:
@@ -196,22 +205,38 @@ if __name__ == "__main__":
                 # All sources have tuned to the specified channel
                 state = State.Collecting
             
+                # Print a column header
+                print("\nData Source   PPS     Packets    RX Percent")
+            
         elif state == State.Collecting:
             # Update packet counters
             for ds in datasources:
                 ds_name = ds['kismet.datasource.name']
-                if ds_name in sources_by_name:
-                    counts[ds_name] = ds['kismet.datasource.num_packets'] - sources_by_name[ds_name].offset
+                ds_count = ds['kismet.datasource.num_packets']
 
-            max_count = max(counts.values())
+                # Is this a source we care about?
+                if ds_name in sources_by_name:
+
+                    # Yup, update packet counter
+                    sources_by_name[ds_name].last_count = sources_by_name[ds_name].count
+                    sources_by_name[ds_name].count = ds_count - sources_by_name[ds_name].offset
+
+            max_count = get_max(sources_by_name)
             if max_count == 0: max_count = 1
 
-            for ifc, count in counts.items():
-                print("{} {} ({:.2%})".format(ifc, count, count / max_count))
+            print("t={}-------------------------------------------".format(t))
+            for source_name, source in sources_by_name.items():
+                #print("{} {} ({:.2%})".format(ifc, count, count / max_count))
+                print("{:<10} {:>6} {:>10} {:>12.2%}".format(
+                    source_name,
+                    source.count - source.last_count,
+                    source.count,
+                    source.count / max_count))
 
         else:
             print("State error")
             sys.exit(1)
 
+        t += 1
         time.sleep(1)
 
