@@ -201,10 +201,14 @@ if __name__ == "__main__":
                 # All sources have tuned to the specified channel
                 state = State.Collecting
             
-                # Print a column header
-                print("\nData Source   PPS     Packets    RX Percent")
-            
         elif state == State.Collecting:
+            print('\x1bc')
+            
+            # Print a column header
+            print("t={}".format(t))
+            print("\nData Source    PPS     Packets        RX %")
+            print(  "------------------------------------------")
+
             # Update packet counters
             for ds in datasources:
                 ds_name = ds['kismet.datasource.name']
@@ -220,10 +224,9 @@ if __name__ == "__main__":
             max_count = get_max(sources_by_name)
             if max_count == 0: max_count = 1
 
-            print("t={}-------------------------------------------".format(t))
             for source_name, source in sources_by_name.items():
                 #print("{} {} ({:.2%})".format(ifc, count, count / max_count))
-                print("{:<10} {:>6} {:>10} {:>12.2%}".format(
+                print("{:<12}{:>6}{:>12}{:>12.2%}".format(
                     source_name,
                     source.count - source.last_count,
                     source.count,
