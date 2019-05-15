@@ -205,8 +205,7 @@ if __name__ == "__main__":
             print('\x1bc')
             
             # Print a column header
-            print("t={}".format(t))
-            print("\nData Source    PPS     Packets        RX %")
+            print("Data Source    PPS     Packets        RX %")
             print(  "------------------------------------------")
 
             # Update packet counters
@@ -231,6 +230,10 @@ if __name__ == "__main__":
                     source.count - source.last_count,
                     source.count,
                     source.count / max_count))
+
+            m, s = divmod(t, 60)
+            h, m = divmod(m, 60)
+            print("\nElapsed time: {} Hours {} Minutes {} Seconds".format(h, m, s))
 
         else:
             print("State error")
