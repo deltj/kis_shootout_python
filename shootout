@@ -170,7 +170,6 @@ if __name__ == "__main__":
         print("No sources to test!")
         sys.exit(1)
 
-    start_time = datetime.now()
     while True:
 
         # Check that our session is still valid
