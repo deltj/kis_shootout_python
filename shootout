@@ -130,11 +130,14 @@ if __name__ == "__main__":
             # The specified source wasn't found, check if there's an interface
             # available by that name and enable it if so
             if have_interface(kr, source_name):
-                if kr.add_datasource(source_name):
-                    print("Added datasource {}".format(source_name))
-                else:
+                try:
+                    if kr.add_datasource(source_name):
+                        print("Added datasource {}".format(source_name))
+                    else:
+                        print("Failed to add datasource {}".format(source_name))
+                        sys.exit(1)
+                except KismetRest.KismetRequestException:
                     print("Failed to add datasource {}".format(source_name))
-                    sys.exit(1)
             else:
                 print("Kismet doesn't have a source named {}".format(source_name))
                 sys.exit(1)
