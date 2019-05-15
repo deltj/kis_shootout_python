@@ -35,7 +35,7 @@ def signal_handler(sig, frame):
 
     if sig == signal.SIGINT:
         print("Caught SIGINT")
-        die = True
+        sys.exit(0)
 
 def have_source(kr, source_name):
     """
@@ -171,10 +171,6 @@ if __name__ == "__main__":
 
     t=0
     while True:
-        # Check if we've been killed
-        if die:
-            print("Quitting...")
-            sys.exit(0)
 
         # Check that our session is still valid
         if not kr.check_session():
