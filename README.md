@@ -2,7 +2,7 @@
 
 A (new) Kismet WiFi data source shootout implementation in Python3, using the KismetRest library. 
 
-The program prints packet counters once per second, and displays PPS, total packets received, and the relative percentage of packets received by each datasource that has been specified.
+The program displays PPS, total packets received, and the relative percentage of packets received for each datasource that has been specified. Output is updated once per second until the program is killed with CTRL+C.
 
 ```
 Data Source    PPS     Packets        RX %
