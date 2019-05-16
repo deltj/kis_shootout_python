@@ -93,6 +93,8 @@ if __name__ == "__main__":
             help="a user name to log into Kismet with")
     parser.add_argument("-p", dest="ask_for_password", action="store_true",
             help="tells this program to prompt for a password")
+    parser.add_argument("-P", dest="password",
+            help="a password to log into Kismet with")
     parser.add_argument("-s", dest="server", default="localhost",
             help="ip/hostname of kismet server (defaults to localhost")
 
@@ -104,6 +106,9 @@ if __name__ == "__main__":
         username = args.user
 
     password = ""
+    if args.password:
+        password = args.password
+
     if args.ask_for_password:
         password = getpass.getpass()
 
