@@ -236,12 +236,26 @@ if __name__ == "__main__":
 
             for source_name, source in sources_by_name.items():
                 #print("{} {} ({:.2%})".format(ifc, count, count / max_count))
-                print("{:<12}{:<12}{:>6}{:>12}{:>12.2%}".format(
+                color = ''
+                percent = ''
+                percent = int(source.count / max_count)
+                #colors by percent
+                if percent < .75:
+                    color = '\033[91m'
+                elif percent < .90:
+                    color = '\033[93m'
+                else:
+                    color = '\033[94m'
+                #highlight failures in red
+                if ( source.count - source.last_count ) < 1:
+                    color = '\033[91m'
+                print("{}{:<12}{:<12}{:>6}{:>12}{:>12.2%}\033[0m".format(
+                    color,
                     source_name,
                     source.hardware,
                     source.count - source.last_count,
                     source.count,
-                    source.count / max_count))
+                    percent))
 
             time_delta = datetime.now() - start_time
             m, s = divmod(int(time_delta.total_seconds()), 60)
