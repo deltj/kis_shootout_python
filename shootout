@@ -248,6 +248,8 @@ if __name__ == "__main__":
                     color = '\033[91m'
                 elif percent < .90:
                     color = '\033[93m'
+                elif percent == 1:
+                    color = '\033[7;94m'
                 else:
                     color = '\033[94m'
                 #highlight failures in red
