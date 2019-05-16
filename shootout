@@ -266,7 +266,7 @@ if __name__ == "__main__":
             time_delta = datetime.now() - start_time
             m, s = divmod(int(time_delta.total_seconds()), 60)
             h, m = divmod(m, 60)
-            print("\nElapsed time: {} Hours {} Minutes {} Seconds".format(h, m, s))
+            print("\nElapsed time on channel {}: {} Hours {} Minutes {} Seconds".format(args.channel, h, m, s))
 
         else:
             print("State error")
