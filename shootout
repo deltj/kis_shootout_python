@@ -237,8 +237,7 @@ if __name__ == "__main__":
             for source_name, source in sources_by_name.items():
                 #print("{} {} ({:.2%})".format(ifc, count, count / max_count))
                 color = ''
-                percent = ''
-                percent = int(source.count / max_count)
+                percent = source.count / max_count
                 #colors by percent
                 if percent < .75:
                     color = '\033[91m'
