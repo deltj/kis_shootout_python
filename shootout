@@ -28,8 +28,9 @@ class SourceInfo:
     name = ""       # The name of this data source
     uuid = 0        # Kismet's UUID for this data source
     count = 0       # The number of frames observed by this data source
-    last_count = 0  # The number of frames observed by this data source, one second ago
+    last_count = 0  # The previous number of frames observed by this data source
     offset = 0      # Frame count offset (to account for sync time)
+    hardware = ""
 
 def signal_handler(sig, frame):
     global die
@@ -148,6 +149,7 @@ if __name__ == "__main__":
         for ds in datasources:
             if ds['kismet.datasource.name'] == source.name:
                 source.uuid = ds['kismet.datasource.uuid']
+                source.hardware = ds['kismet.datasource.hardware']
         if source.uuid == 0:
             print("Kismet doesn't have a source named {}".format(source.name))
             sys.exit(1)
@@ -211,8 +213,8 @@ if __name__ == "__main__":
             print('\x1bc')
             
             # Print a column header
-            print("Data Source    PPS     Packets        RX %")
-            print(  "------------------------------------------")
+            print("Source      Hardware       PPS     Packets        RX %")
+            print("------------------------------------------------------")
 
             # Update packet counters
             for ds in datasources:
@@ -231,8 +233,9 @@ if __name__ == "__main__":
 
             for source_name, source in sources_by_name.items():
                 #print("{} {} ({:.2%})".format(ifc, count, count / max_count))
-                print("{:<12}{:>6}{:>12}{:>12.2%}".format(
+                print("{:<12}{:<12}{:>6}{:>12}{:>12.2%}".format(
                     source_name,
+                    source.hardware,
                     source.count - source.last_count,
                     source.count,
                     source.count / max_count))
