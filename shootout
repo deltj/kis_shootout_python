@@ -10,9 +10,6 @@ import time
 
 import KismetRest
 
-# URI for accessing Kismet
-uri = "http://localhost:2501"
-
 # Flag to tell the program to exit
 die = False
 
@@ -96,6 +93,8 @@ if __name__ == "__main__":
             help="a user name to log into Kismet with")
     parser.add_argument("-p", dest="ask_for_password", action="store_true",
             help="tells this program to prompt for a password")
+    parser.add_argument("-s", dest="server", default="localhost",
+            help="ip/hostname of kismet server (defaults to localhost")
 
     # Process command-line arguments
     args = parser.parse_args()
@@ -115,6 +114,10 @@ if __name__ == "__main__":
 
     if len(sources_by_name) < 2:
         print("A shootout with only one data source is uninteresting, but whatever...")
+
+    # URI for accessing Kismet
+    uri = "http://{}:2501".format(args.server)
+    print("Connecting to Kismet Server {}".format(uri))
 
     # Connect to Kismet
     kr = KismetRest.KismetConnector(uri)
