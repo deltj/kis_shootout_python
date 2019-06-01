@@ -7,6 +7,7 @@ import getpass
 import json
 import logging
 import requests
+from requests.exceptions import Timeout
 import signal
 import sys
 import time
@@ -29,26 +30,38 @@ class SourceInfo:
     offset = 0      # Frame count offset (to account for sync time)
     hardware = ""
 
-def http_get(uri, timeout=5):
+def http_get(uri, timeout=5, retries=1):
     """
     This function attempts to retrieve the specified URI using an HTTP GET request.
     If a timeout is specified, the function will wait at most that number of seconds.
     """
     logging.info(f"Making GET request to {uri}")
 
-    start = time.time()
+    attempt = 0
+    while attempt <= retries:
+        start = time.time()
 
-    response = None
-    try:
-        response = session.get(uri, timeout=timeout)
+        response = None
+        try:
+            response = session.get(uri, timeout=timeout)
 
-    except Exception as e:
-        logging.error("HTTP GET failed for {} with exception: {}".format(uri, e))
+        except Timeout:
+            logging.error(f"HTTP GET timed out (timeout was set to {timeout} sec)")
+            attempt += 1
+
+        except Exception as e:
+            logging.error("HTTP GET failed for {} with exception: {}".format(uri, e))
+            sys.exit(1)
+
+        else:
+            end = time.time()
+            elapsed = end - start
+            logging.info("Request took {0:.3f} seconds".format(elapsed))
+            break
+
+    if attempt == retries:
+        logging.error(f"Too many timeouts ({attempt}) for HTTP GET")
         sys.exit(1)
-
-    end = time.time()
-    elapsed = end - start
-    logging.info("Request took {0:.3f} seconds".format(elapsed))
 
     return response
 
@@ -210,8 +223,8 @@ if __name__ == "__main__":
     # Configure logging
     FORMAT = '[%(asctime)-15s %(levelname)s] %(message)s'
     #logging.basicConfig(stream=sys.stdout, format=FORMAT, level=logging.INFO)
-    logging.basicConfig(filename='shootout.log', format=FORMAT, level=logging.INFO)
     logger = logging.getLogger()
+    logger.propagate = False
 
     # Register signal handler for SIGINT (CTRL+C) 
     signal.signal(signal.SIGINT, signal_handler)
@@ -223,6 +236,8 @@ if __name__ == "__main__":
             help="data sources to use in the shootout (e.g. wlan0)")
     parser.add_argument("-c", dest="channel", required=True,
             help="the channel to monitor")
+    parser.add_argument("-l", dest="log", action="store_true",
+            help="log diagnostic data to shootout.log")
     parser.add_argument("-u", dest="user",
             help="a user name to log into Kismet with")
     parser.add_argument("-p", dest="ask_for_password", action="store_true",
@@ -245,6 +260,10 @@ if __name__ == "__main__":
 
     if args.ask_for_password:
         password = getpass.getpass()
+
+    if args.log:
+        logging.basicConfig(filename='shootout.log', format=FORMAT, level=logging.INFO)
+        logger.propagate = False
 
     # Configure HTTP client session
     session = requests.Session()
@@ -273,9 +292,11 @@ if __name__ == "__main__":
                 continue
 
             # Add the interface as a datasource
+            logging.info(f"Interface {source_name} found, adding as a datasource")
             kis_add_source(source_name)
 
-        logging.info(f"Source found")
+        else:
+            logging.info(f"Source found")
 
         si = SourceInfo()
         si.name = source_name
