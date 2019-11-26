@@ -4,22 +4,20 @@ import argparse
 from datetime import datetime
 from enum import Enum
 import getpass
+import json
+import logging
+import requests
+from requests.exceptions import Timeout
 import signal
 import sys
 import time
 
-try:
-  import KismetRest
-except:
-  import kismet_rest as KismetRest
-
-# Flag to tell the program to exit
-die = False
-
-# Current program state. Syncing means we're waiting for cards to be tuned to
-# the specified channel, Collecting means the cards are tuned and we're counting
-# frames
 class State(Enum):
+    """
+    Current program state. Syncing means we're waiting for cards to be tuned to
+    the specified channel, Collecting means the cards are tuned and we're counting
+    frames
+    """
     Syncing = 1,
     Collecting = 2
 
@@ -32,44 +30,179 @@ class SourceInfo:
     offset = 0      # Frame count offset (to account for sync time)
     hardware = ""
 
-def signal_handler(sig, frame):
-    global die
+def http_get(uri, timeout=5, retries=1):
+    """
+    This function attempts to retrieve the specified URI using an HTTP GET request.
+    If a timeout is specified, the function will wait at most that number of seconds.
+    """
+    logging.info(f"Making GET request to {uri}")
 
-    if sig == signal.SIGINT:
-        print("Caught SIGINT")
-        sys.exit(0)
+    attempt = 0
+    while attempt <= retries:
+        start = time.time()
 
-def have_source(kr, source_name):
+        response = None
+        try:
+            response = session.get(uri, timeout=timeout)
+
+        except Timeout:
+            logging.error(f"HTTP GET timed out (timeout was set to {timeout} sec)")
+            attempt += 1
+
+        except Exception as e:
+            logging.error("HTTP GET failed for {} with exception: {}".format(uri, e))
+            sys.exit(1)
+
+        else:
+            end = time.time()
+            elapsed = end - start
+            logging.info("Request took {0:.3f} seconds".format(elapsed))
+            break
+
+    if attempt == retries:
+        logging.error(f"Too many timeouts ({attempt}) for HTTP GET")
+        sys.exit(1)
+
+    return response
+
+def http_post(uri, post_data, timeout=5):
+    """
+    This function attempts to make an HTTP POST to the specified URI
+    """
+    logging.info(f"Making POST request to {uri}")
+
+    start = time.time()
+
+    if post_data == None:
+        post_data = ""
+
+    #print(post_data)
+    response = None
+    try:
+        response = session.post(uri, data=post_data, timeout=timeout)
+
+    except Exception as e:
+        logging.error("HTTP POST failed for {} with exception: {}".format(uri, e))
+        sys.exit(1)
+
+    end = time.time()
+    elapsed = end - start
+    logging.info("Request took {0:.3f} seconds".format(elapsed))
+
+    return response
+
+def kis_get_bool(uri):
+    """
+    This function performs an HTTP GET for the specified URI, and returns True
+    or False depending on the response code.
+    """
+    actual_uri = f"{base_uri}{uri}"
+    response = http_get(actual_uri)
+
+    if response.status_code == 200:
+        return True
+    else:
+        return False
+
+def kis_get_json(uri):
+    """
+    This function GETs the specified URI, expecting a JSON response.
+    The JSON response is formatted into a python dictionary and returned.
+    """
+    actual_uri = f"{base_uri}{uri}"
+    response = http_get(actual_uri)
+
+    if response.status_code != 200:
+        logging.error(f"HTTP GET failed for {actual_uri}")
+        sys.exit(1)
+
+    json_result = response.content.decode('utf-8')
+    dict_result = json.loads(json_result)
+    return dict_result
+
+def kis_post_cmd(uri, obj):
+    actual_uri = f"{base_uri}{uri}"
+    post_data = json.dumps(obj)
+    post_data = {
+            "json": post_data
+        }
+
+    response = http_post(actual_uri, post_data)
+
+    if response.status_code != 200:
+        logging.error(f"Kismet command failed for {uri} with status {response.status_code}")
+        sys.exit(1)
+
+def kis_get_sources():
+    """
+    Return a dictionary of all available datasources on the kismet server
+    """
+    url = f"/datasource/all_sources.json"
+    return kis_get_json(url)
+
+def kis_get_interfaces():
+    """
+    Return a dictionary of all available interfaces on the kismet server
+    """
+    url = f"/datasource/list_interfaces.json"
+    return kis_get_json(url)
+
+def kis_check_session():
+    return kis_get_bool("/session/check_session")
+
+def kis_have_source(source_name):
     """
     This function determines whether the specified datasource is known to
-    the Kismet server that KismetRest is currently connected to.
+    the Kismet server
 
     Arguments:
-    kr -- A KismetRest object that is already connected to a Kismet server
     source_name -- The name of a datasource to look for
     """
-    datasources = kr.datasources()
-    for ds in datasources:
-        if ds['kismet.datasource.name'] == source_name:
+    sources = kis_get_sources()
+    for source in sources:
+        if source['kismet.datasource.name'] == source_name:
             return True
-
+    
     return False
 
-def have_interface(kr, interface_name):
+def kis_add_source(interface_name):
     """
-    This function determines whether the specified interface is known to
-    the Kismet server that KismetRest is currently connected to.
+    This function adds the specified interface as a datasource
 
     Arguments:
-    kr -- A KismetRest object that is already connected to a Kismet server
     interface_name -- The name of an interface to look for
     """
-    interfaces = kr.datasource_list_interfaces()
+    logging.info(f"Adding datasource {interface_name}")
+
+    cmd = {
+        "definition": interface_name
+    }
+
+    kis_post_cmd("/datasource/add_source.cmd", cmd)
+
+def kis_have_interface(interface_name):
+    """
+    This function determines whether the specified interface is known to
+    the Kismet server
+
+    Arguments:
+    interface_name -- The name of an interface to look for
+    """
+    interfaces = kis_get_interfaces()
     for interface in interfaces:
         if interface['kismet.datasource.probed.interface'] == interface_name:
             return True
 
     return False
+
+def kis_set_channel(uuid, channel):
+    logging.info(f"Setting channel for datasource {uuid} to {channel}")
+
+    cmd = {
+        "channel": channel
+    }
+
+    kis_post_cmd(f"/datasource/by-uuid/{uuid}/set_channel.cmd", cmd)
 
 def get_max(sources_by_name):
     max_packets = 0
@@ -80,18 +213,31 @@ def get_max(sources_by_name):
 
     return max_packets
 
+def signal_handler(sig, frame):
+    if sig == signal.SIGINT:
+        print("Caught SIGINT")
+        sys.exit(0)
 
 if __name__ == "__main__":
-    sources_by_name = dict()
+
+    # Configure logging
+    FORMAT = '[%(asctime)-15s %(levelname)s] %(message)s'
+    #logging.basicConfig(stream=sys.stdout, format=FORMAT, level=logging.INFO)
+    logger = logging.getLogger()
+    logger.propagate = False
 
     # Register signal handler for SIGINT (CTRL+C) 
     signal.signal(signal.SIGINT, signal_handler)
+
+    sources_by_name = dict()
 
     parser = argparse.ArgumentParser(description="Kismet datasource shootout")
     parser.add_argument("sources", metavar="SRC", nargs="+",
             help="data sources to use in the shootout (e.g. wlan0)")
     parser.add_argument("-c", dest="channel", required=True,
             help="the channel to monitor")
+    parser.add_argument("-l", dest="log", action="store_true",
+            help="log diagnostic data to shootout.log")
     parser.add_argument("-u", dest="user",
             help="a user name to log into Kismet with")
     parser.add_argument('-P', '-p', dest="password",
@@ -112,89 +258,81 @@ if __name__ == "__main__":
     else:
         password = getpass.getpass()
 
+    if args.log:
+        logging.basicConfig(filename='shootout.log', format=FORMAT, level=logging.INFO)
+        logger.propagate = False
+
+    # Configure HTTP client session
+    session = requests.Session()
+    session.auth = (username, password)
+
+    # URI for accessing Kismet
+    base_uri = "http://{}:2501".format(args.server)
+    print("Connecting to Kismet Server {}".format(base_uri))
+
+    # Verify login
+    if not kis_check_session():
+        print("Invalid login")
+        sys.exit(1)
+    else:
+        print("Logged in!")
+
+    # Configure datasources
     for source_name in args.sources:
+        logging.info(f"Checking for datasource named {source_name}")
+
+        if not kis_have_source(source_name):
+            logging.info(f"Source {source_name} not found")
+            logging.info(f"Checking for interface named {source_name}")
+            if not kis_have_interface(source_name):
+                logging.warning(f"No interface named {source_name}, ignoring")
+                continue
+
+            # Add the interface as a datasource
+            logging.info(f"Interface {source_name} found, adding as a datasource")
+            kis_add_source(source_name)
+
+        else:
+            logging.info(f"Source found")
+
         si = SourceInfo()
         si.name = source_name
         sources_by_name[source_name] = si
 
-    if len(sources_by_name) < 2:
-        print("A shootout with only one data source is uninteresting, but whatever...")
-
-    # URI for accessing Kismet
-    uri = "http://{}:2501".format(args.server)
-    print("Connecting to Kismet Server {}".format(uri))
-
-    # Connect to Kismet
-    kr = KismetRest.KismetConnector(uri)
-    #kr.set_debug(True)
-    kr.set_login(username, password)
-
-    if not kr.check_session():
-        print("Invalid login")
+    # Make sure some data sources were configured
+    if len(sources_by_name) == 0:
+        logging.error("No sources configured, exiting")
         sys.exit(1)
 
-    # Make sure Kismet actually has the specified sources
-    for source_name, source in sources_by_name.items():
-        if not have_source(kr, source_name):
-            # The specified source wasn't found, check if there's an interface
-            # available by that name and enable it if so
-            if have_interface(kr, source_name):
-                try:
-                    if kr.add_datasource("{}:type=linuxwifi,expand_ht20=true,channel_hop=false,channel={}".format(source_name, args.channel)):
-                        print("Added datasource {}".format(source_name))
-                    else:
-                        print("Failed to add datasource {}".format(source_name))
-                        sys.exit(1)
-                except KismetRest.KismetRequestException:
-                    print("Failed to add datasource {}".format(source_name))
-            else:
-                print("Kismet doesn't have a source named {}".format(source_name))
-                sys.exit(1)
-
     # Update data source UUIDs
-    datasources = kr.datasources()
-    for source_name, source in sources_by_name.items():
-        for ds in datasources:
-            if ds['kismet.datasource.name'] == source.name:
-                source.uuid = ds['kismet.datasource.uuid']
-                source.hardware = ds['kismet.datasource.hardware']
-        if source.uuid == 0:
-            print("Kismet doesn't have a source named {}".format(source.name))
-            sys.exit(1)
+    datasources = kis_get_sources()
+    for ds in datasources:
+        name = ds['kismet.datasource.name']
+        sources_by_name[name].uuid = ds['kismet.datasource.uuid']
+        sources_by_name[name].hardware = ds['kismet.datasource.hardware']
 
     # Tune data sources to the specified channel
     state = State.Syncing
     for source_name, source in sources_by_name.copy().items():
         print("Tuning data source {} to channel {}".format(source_name, args.channel))
-
-        try:
-            # This could throw a KismetRequestException if the tune fails
-            kr.config_datasource_set_channel(source.uuid, args.channel)
-
-        except KismetRest.KismetRequestException:
-            print("Failed to tune {} to {}, ignoring this datasource".format(source_name, args.channel))
-
-            # Remove this datsource from the list
-            sources_by_name.pop(source_name)
-
-    # Make sure there are still some data sources to poll
-    # (it's possible they all failed to tune?)
-    if len(sources_by_name) < 1:
-        print("No sources to test!")
-        sys.exit(1)
+        kis_set_channel(source.uuid, args.channel)
 
     while True:
 
         # Check that our session is still valid
-        if not kr.check_session():
-            print("check_session failed")
-            kr.login()
+        if not kis_check_session():
+            logging.warning("Session check failed")
+            # TODO: implement "__update_session" functionality
 
-        datasources = kr.datasources()
+        datasources = kis_get_sources()
 
         if state == State.Syncing:
+            # Syncing means we're waiting for all of the cards to tune to 
+            # the specified channel
+
             all_tuned = True
 
+            # Check whether all the sources have tuned
             for ds in datasources:
                 ds_name = ds['kismet.datasource.name']
                 ds_chan = ds['kismet.datasource.channel']
@@ -218,11 +356,14 @@ if __name__ == "__main__":
                 start_time = datetime.now()
             
         elif state == State.Collecting:
+            # Collecting means all the cards are tuned and we can start
+            # recording packet counters
+
             print('\x1bc')
             
             # Print a column header
-            print("Source      Hardware       PPS     Packets        RX %")
-            print("------------------------------------------------------")
+            print("Source          Hardware       PPS     Packets        RX %")
+            print("----------------------------------------------------------")
 
             # Update packet counters
             for ds in datasources:
@@ -255,7 +396,7 @@ if __name__ == "__main__":
                 #highlight failures in red
                 if ( source.count - source.last_count ) < 1:
                     color = '\033[91m'
-                print("{}{:<12}{:<12}{:>6}{:>12}{:>12.2%}\033[0m".format(
+                print("{}{:<16}{:<12}{:>6}{:>12}{:>12.2%}\033[0m".format(
                     color,
                     source_name,
                     source.hardware,
