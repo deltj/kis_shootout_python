@@ -240,9 +240,7 @@ if __name__ == "__main__":
             help="log diagnostic data to shootout.log")
     parser.add_argument("-u", dest="user",
             help="a user name to log into Kismet with")
-    parser.add_argument("-p", dest="ask_for_password", action="store_true",
-            help="tells this program to prompt for a password")
-    parser.add_argument("-P", dest="password",
+    parser.add_argument('-P', '-p', dest="password",
             help="a password to log into Kismet with")
     parser.add_argument("-s", dest="server", default="localhost",
             help="ip/hostname of kismet server (defaults to localhost")
@@ -257,8 +255,7 @@ if __name__ == "__main__":
     password = ""
     if args.password:
         password = args.password
-
-    if args.ask_for_password:
+    else:
         password = getpass.getpass()
 
     if args.log:
