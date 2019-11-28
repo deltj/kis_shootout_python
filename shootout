@@ -308,8 +308,9 @@ if __name__ == "__main__":
     datasources = kis_get_sources()
     for ds in datasources:
         name = ds['kismet.datasource.name']
-        sources_by_name[name].uuid = ds['kismet.datasource.uuid']
-        sources_by_name[name].hardware = ds['kismet.datasource.hardware']
+        if name in sources_by_name:
+            sources_by_name[name].uuid = ds['kismet.datasource.uuid']
+            sources_by_name[name].hardware = ds['kismet.datasource.hardware']
 
     # Tune data sources to the specified channel
     state = State.Syncing
