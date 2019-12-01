@@ -218,6 +218,13 @@ def signal_handler(sig, frame):
         print("Caught SIGINT")
         sys.exit(0)
 
+# Extend ArgumentParser to override the error function
+class CustomArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        self.print_help()
+        sys.stderr.write("\nNote: Kismet must be running for shootout to work!\n\n")
+        sys.exit(2)
+
 if __name__ == "__main__":
 
     # Configure logging
@@ -231,7 +238,7 @@ if __name__ == "__main__":
 
     sources_by_name = dict()
 
-    parser = argparse.ArgumentParser(description="Kismet datasource shootout")
+    parser = CustomArgumentParser(description="Kismet datasource shootout")
     parser.add_argument("sources", metavar="SRC", nargs="+",
             help="data sources to use in the shootout (e.g. wlan0)")
     parser.add_argument("-c", dest="channel", required=True,
