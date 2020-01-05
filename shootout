@@ -21,8 +21,10 @@ class State(Enum):
     Syncing = 1,
     Collecting = 2
 
-# This object stores information about a data source we're tracking
 class SourceInfo:
+    """
+    This object stores information about a data source we're tracking
+    """
     name = ""       # The name of this data source
     uuid = 0        # Kismet's UUID for this data source
     count = 0       # The number of frames observed by this data source
@@ -32,8 +34,13 @@ class SourceInfo:
 
 def http_get(uri, timeout=5, retries=1):
     """
-    This function attempts to retrieve the specified URI using an HTTP GET request.
-    If a timeout is specified, the function will wait at most that number of seconds.
+    This function attempts to retrieve the specified URI using an HTTP GET
+    request.
+
+    timeout -- The HTTP request will wait up to this number of seconds for
+               a response
+    retries -- If the HTTP GET fails, it will be retried up to the specifiedo
+               number of times
     """
     logging.info(f"Making GET request to {uri}")
 
@@ -68,6 +75,9 @@ def http_get(uri, timeout=5, retries=1):
 def http_post(uri, post_data, timeout=5):
     """
     This function attempts to make an HTTP POST to the specified URI
+
+    timeout -- The HTTP request will wait up to this number of seconds for
+               a response
     """
     logging.info(f"Making POST request to {uri}")
 
@@ -87,7 +97,7 @@ def http_post(uri, post_data, timeout=5):
 
     end = time.time()
     elapsed = end - start
-    logging.info("Request took {0:.3f} seconds".format(elapsed))
+    logging.info("HTTP POST to {0} took {1:.3f} seconds".format(uri, elapsed))
 
     return response
 
@@ -121,6 +131,14 @@ def kis_get_json(uri):
     return dict_result
 
 def kis_post_cmd(uri, obj):
+    """
+    Post the specified REST API command to the Kismet server
+
+    See: https://www.kismetwireless.net/docs/devel/webui_rest/commands/
+
+    uri -- The (relative) uri for the destination API endpoint
+    obj -- A dictionary representing the command to post
+    """
     actual_uri = f"{base_uri}{uri}"
     post_data = json.dumps(obj)
     post_data = {
@@ -131,7 +149,9 @@ def kis_post_cmd(uri, obj):
 
     if response.status_code != 200:
         logging.error(f"Kismet command failed for {uri} with status {response.status_code}")
-        sys.exit(1)
+        return False
+
+    return True
 
 def kis_get_sources():
     """
@@ -202,7 +222,11 @@ def kis_set_channel(uuid, channel):
         "channel": channel
     }
 
-    kis_post_cmd(f"/datasource/by-uuid/{uuid}/set_channel.cmd", cmd)
+    result = kis_post_cmd(f"/datasource/by-uuid/{uuid}/set_channel.cmd", cmd)
+    
+    if not result and not ignore_chan_err:
+        logging.error("Failed to set channel for uuid {uuid}")
+        sys.exit(1)
 
 def get_max(sources_by_name):
     max_packets = 0
@@ -251,6 +275,8 @@ if __name__ == "__main__":
             help="a password to log into Kismet with")
     parser.add_argument("-s", dest="server", default="localhost",
             help="ip/hostname of kismet server (defaults to localhost")
+    parser.add_argument("-x", dest="ignore_chan_err",
+            help="Ignore errors while switching channels")
 
     # Process command-line arguments
     args = parser.parse_args()
@@ -276,6 +302,11 @@ if __name__ == "__main__":
     # URI for accessing Kismet
     base_uri = "http://{}:2501".format(args.server)
     print("Connecting to Kismet Server {}".format(base_uri))
+
+    # If true, ignore channel switching errors
+    ignore_chan_err = False
+    if args.ignore_chan_err:
+        ignore_chan_err = True
 
     # Verify login
     if not kis_check_session():
@@ -349,7 +380,7 @@ if __name__ == "__main__":
                 if ds_name in sources_by_name:
 
                     # Has this card tuned yet?
-                    if ds_chan == args.channel:
+                    if (ds_chan == args.channel) or ignore_chan_err:
                         # Yes, update its offset
                         sources_by_name[ds_name].offset = ds['kismet.datasource.num_packets']
                         print("Offset for {} = {}".format(ds_name, sources_by_name[ds_name].offset))
