@@ -275,7 +275,7 @@ if __name__ == "__main__":
             help="a password to log into Kismet with")
     parser.add_argument("-s", dest="server", default="localhost",
             help="ip/hostname of kismet server (defaults to localhost")
-    parser.add_argument("-x", dest="ignore_chan_err",
+    parser.add_argument("-x", dest="ignore_chan_err", nargs="?",
             help="Ignore errors while switching channels")
 
     # Process command-line arguments
