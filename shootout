@@ -263,7 +263,7 @@ if __name__ == "__main__":
     sources_by_name = dict()
 
     parser = CustomArgumentParser(description="Kismet datasource shootout")
-    parser.add_argument("sources", metavar="SRC", nargs="+",
+    parser.add_argument("sources", metavar="SRC", nargs="*",
             help="data sources to use in the shootout (e.g. wlan0)")
     parser.add_argument("-c", dest="channel", required=True,
             help="the channel to monitor")
@@ -277,6 +277,8 @@ if __name__ == "__main__":
             help="ip/hostname of kismet server (defaults to localhost")
     parser.add_argument("-x", dest="ignore_chan_err", nargs="?",
             help="Ignore errors while switching channels")
+    parser.add_argument("--all-wifi", dest="allwifi", action="store_true",
+            help="Use all available Wifi interfaces")
 
     # Process command-line arguments
     args = parser.parse_args()
@@ -315,8 +317,19 @@ if __name__ == "__main__":
     else:
         print("Logged in!")
 
+    sources = args.sources
+
+    if args.allwifi:
+        print("allwifi")
+        # Find and use all linuxwifi datasources
+        #NOTE: This will probably break windows/mac support?
+        interfaces = kis_get_interfaces()
+        for interface in interfaces:
+            if interface['kismet.datasource.type_driver']['kismet.datasource.driver.type'] == "linuxwifi" and "mon" not in interface['kismet.datasource.probed.interface']:
+                sources.append(interface['kismet.datasource.probed.interface'])
+
     # Configure datasources
-    for source_name in args.sources:
+    for source_name in sources:
         logging.info(f"Checking for datasource named {source_name}")
 
         if not kis_have_source(source_name):
